@@ -8,6 +8,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -20,6 +21,14 @@ public class ChatServer extends Thread {
     private static final ArrayList<User> users = new ArrayList<>();
     private static final int MAX_CLIENTS = 16;
     private static final int PORT = 1234;
+
+    public static void OnDisconnect(ClientConnection clientConnection) {
+        User u = GetUserByIP(clientConnection.GetIP());
+        if (u != null) {
+            LogoutUser(u);
+        }
+    }
+
     private boolean IsIPConnected(InetAddress ip) {
         AtomicBoolean found = new AtomicBoolean(false);
         connections.forEach(clientConnection -> { if (clientConnection.GetIP().equals(ip)) found.set(true); });
@@ -31,17 +40,36 @@ public class ChatServer extends Thread {
         return found.get();
     }
     public static void AddUser(User user) {
+        HashMap<String, String> args = new HashMap<>();
+        args.put("name", user.name);
+        SendToAllClients(Utils.generateXML("userlogin", args));
         users.add(user);
     }
     public static User GetUserByUUID(UUID uuid) {
-        AtomicReference<User> found = null;
-        users.forEach(user -> { if (user.uuid == uuid) found.set(user); });
+        AtomicReference<User> found = new AtomicReference<>(null);
+        users.forEach(user -> { if (user.uuid.equals(uuid)) found.set(user); });
         return found.get();
     }
     public static User GetUserByIP(InetAddress ip) {
-        AtomicReference<User> found = null;
-        users.forEach(user -> { if (user.ip == ip) found.set(user); });
+        AtomicReference<User> found = new AtomicReference<>(null);
+        users.forEach(user -> { if (user.ip.equals(ip)) found.set(user); });
         return found.get();
+    }
+    public static ArrayList<User> GetUsers() {
+        return users;
+    }
+    public static void LogoutUser(User user) {
+        String name = user.name;
+        users.remove(user);
+        HashMap<String, String> args = new HashMap<>();
+        args.put("name", name);
+        SendToAllClients(Utils.generateXML("userlogout", args));
+        AtomicReference<ClientConnection> foundCon = new AtomicReference<>(null);
+        connections.forEach(con -> { if (con.GetIP() == user.ip) foundCon.set(con); });
+        connections.remove(foundCon.get());
+    }
+    public static void SendToAllClients(String message) {
+        connections.forEach(c -> c.SendMessage(message));
     }
     @Override
     public void run()  {

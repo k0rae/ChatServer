@@ -8,7 +8,14 @@ import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.util.HashMap;
 
@@ -28,14 +35,25 @@ public class XMLParser {
                 if (argList.item(i).getNodeType() == Node.ELEMENT_NODE) {
                     Element argElement = (Element) argList.item(i);
                     String argName = argElement.getTagName();
-                    String argValue = argElement.getTextContent();
+                    String argValue = nodeToString(argElement);
                     argMap.put(argName, argValue);
                 }
             }
             return new NetCommand(commandName, argMap, from);
         } catch (Exception e) {
-            e.printStackTrace();
+            return null;
         }
-        return null;
+    }
+    private static String nodeToString(Node node) throws TransformerException {
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer transformer = tf.newTransformer();
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+        StringWriter writer = new StringWriter();
+        NodeList childNodes = node.getChildNodes();
+        for (int i = 0; i < childNodes.getLength(); i++) {
+            Node childNode = childNodes.item(i);
+            transformer.transform(new DOMSource(childNode), new StreamResult(writer));
+        }
+        return writer.toString();
     }
 }
